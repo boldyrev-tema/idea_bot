@@ -100,6 +100,43 @@
     line-height: 1.5;
   }
 
+  .place-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .place-address {
+    color: var(--hint);
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+  }
+  .place-meta {
+    font-size: 0.95rem;
+    margin-bottom: 18px;
+  }
+  .place-meta .stars { color: #f5b700; }
+  .place-link {
+    display: inline-block;
+    color: var(--accent-text);
+    background: var(--accent);
+    text-decoration: none;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .loading-dots::after {
+    content: "";
+    animation: dots 1.2s steps(4, end) infinite;
+  }
+  @keyframes dots {
+    0% { content: ""; }
+    25% { content: "."; }
+    50% { content: ".."; }
+    75% { content: "..."; }
+  }
+
   /* Фолбэк-кнопки — видны только вне Telegram (нет нативных MainButton/BackButton) */
   .fallback-controls {
     display: none;
@@ -150,6 +187,12 @@
     <div class="icon">🎯</div>
     <div id="idea-budget-label" class="budget-label"></div>
     <div id="idea-text" class="idea-text"></div>
+    <div id="idea-place" style="display:none">
+      <div id="place-name" class="place-name"></div>
+      <div id="place-address" class="place-address"></div>
+      <div id="place-meta" class="place-meta"></div>
+      <a id="place-link" class="place-link" target="_blank" rel="noopener">Открыть в 2ГИС →</a>
+    </div>
   </div>
   <div id="fallback-controls" class="fallback-controls">
     <button id="fallback-more" class="fallback-btn">Ещё вариант 🔁</button>
@@ -157,7 +200,10 @@
   </div>
 </div>
 
-<script src="ideas.js"></script>
+<script>
+  // URL бэкенда (Flask на Railway) — заполнить после деплоя server.py
+  const API_BASE_URL = "https://example.up.railway.app";
+</script>
 <script>
   // telegram-web-app.js всегда создаёт window.Telegram.WebApp, даже вне Telegram —
   // поэтому проверяем platform, а не просто наличие объекта, чтобы понять,
@@ -170,10 +216,13 @@
   }
 
   let currentBudget = null;
-  let lastIdeaText = null;
+
+  const BUDGET_LABELS = { free: "Бесплатно", cheap: "До 500 ₽", medium: "До 1500 ₽" };
 
   const screenBudget = document.getElementById("screen-budget");
   const screenIdea = document.getElementById("screen-idea");
+  const ideaTextEl = document.getElementById("idea-text");
+  const ideaPlaceEl = document.getElementById("idea-place");
 
   function showBudgetScreen() {
     screenIdea.classList.remove("active");
@@ -184,27 +233,56 @@
     }
   }
 
-  function pickIdea(budget) {
-    const pool = getIdeasByBudget(budget);
-    const candidates = pool.filter((i) => i.text !== lastIdeaText);
-    const list = candidates.length ? candidates : pool;
-    const idea = list[Math.floor(Math.random() * list.length)];
-    lastIdeaText = idea.text;
-    return idea.text;
+  function renderStars(rating) {
+    const full = Math.round(rating);
+    return "★".repeat(full) + "☆".repeat(5 - full);
   }
 
-  function showIdeaScreen(budget) {
+  function renderIdea(data) {
+    if (data.type === "place") {
+      ideaTextEl.style.display = "none";
+      ideaPlaceEl.style.display = "block";
+      document.getElementById("place-name").textContent = data.place.name;
+      document.getElementById("place-address").textContent = data.place.address || "";
+      document.getElementById("place-meta").innerHTML =
+        `<span class="stars">${renderStars(data.place.rating)}</span> ${data.place.rating} ` +
+        `· ${data.place.review_count} отзывов · ${data.category}`;
+      document.getElementById("place-link").href = data.place.url;
+    } else {
+      ideaPlaceEl.style.display = "none";
+      ideaTextEl.style.display = "block";
+      ideaTextEl.textContent = data.text;
+    }
+  }
+
+  async function showIdeaScreen(budget) {
     currentBudget = budget;
     document.getElementById("idea-budget-label").textContent = BUDGET_LABELS[budget];
-    document.getElementById("idea-text").textContent = pickIdea(budget);
+
+    ideaPlaceEl.style.display = "none";
+    ideaTextEl.style.display = "block";
+    ideaTextEl.textContent = "Ищу идею";
+    ideaTextEl.classList.add("loading-dots");
 
     screenBudget.classList.remove("active");
     screenIdea.classList.add("active");
-
     if (tg) {
       tg.MainButton.setText("Ещё вариант 🔁");
       tg.MainButton.show();
       tg.BackButton.show();
+    }
+
+    try {
+      const resp = await fetch(`${API_BASE_URL}/api/idea?budget=${budget}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      ideaTextEl.classList.remove("loading-dots");
+      renderIdea(data);
+    } catch (e) {
+      ideaTextEl.classList.remove("loading-dots");
+      ideaPlaceEl.style.display = "none";
+      ideaTextEl.style.display = "block";
+      ideaTextEl.textContent = "Не получилось загрузить идею — попробуй ещё раз";
     }
   }
 
