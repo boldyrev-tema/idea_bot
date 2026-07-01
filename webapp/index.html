@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Чем заняться</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #0f0f13);
+    --text: var(--tg-theme-text-color, #e0e0e8);
+    --hint: var(--tg-theme-hint-color, #8080a0);
+    --accent: var(--tg-theme-button-color, #8060c0);
+    --accent-text: var(--tg-theme-button-text-color, #ffffff);
+    --card-bg: var(--tg-theme-secondary-bg-color, #1a1a2e);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .screen {
+    display: none;
+    flex-direction: column;
+    padding: 24px 20px;
+    flex: 1;
+    animation: fadeIn 0.25s ease;
+  }
+  .screen.active { display: flex; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    color: var(--hint);
+    font-size: 0.9rem;
+    margin-bottom: 28px;
+  }
+
+  .budget-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: transform 0.1s ease, opacity 0.1s ease;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .budget-card:active { transform: scale(0.97); opacity: 0.85; }
+
+  .budget-card .icon {
+    font-size: 1.6rem;
+    flex-shrink: 0;
+  }
+  .budget-card .label {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  #screen-idea {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+
+  .idea-card {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 36px 24px;
+    width: 100%;
+    max-width: 420px;
+  }
+  .idea-card .icon { font-size: 2.4rem; margin-bottom: 16px; }
+  .idea-card .budget-label {
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+  }
+  .idea-card .idea-text {
+    font-size: 1.15rem;
+    line-height: 1.5;
+  }
+
+  /* Фолбэк-кнопки — видны только вне Telegram (нет нативных MainButton/BackButton) */
+  .fallback-controls {
+    display: none;
+    gap: 10px;
+    margin-top: 24px;
+    width: 100%;
+    max-width: 420px;
+  }
+  .fallback-controls.visible { display: flex; flex-direction: column; }
+  .fallback-btn {
+    background: var(--accent);
+    color: var(--accent-text);
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .fallback-btn.secondary {
+    background: transparent;
+    color: var(--hint);
+  }
+</style>
+</head>
+<body>
+
+<div id="screen-budget" class="screen active">
+  <h1>Куда сходить с друзьями?</h1>
+  <p class="subtitle">Выбери бюджет на компанию — подскажу идею</p>
+
+  <div class="budget-card" data-budget="free">
+    <span class="icon">🆓</span>
+    <span class="label">Бесплатно</span>
+  </div>
+  <div class="budget-card" data-budget="cheap">
+    <span class="icon">💵</span>
+    <span class="label">До 500 ₽</span>
+  </div>
+  <div class="budget-card" data-budget="medium">
+    <span class="icon">💰</span>
+    <span class="label">До 1500 ₽</span>
+  </div>
+</div>
+
+<div id="screen-idea" class="screen">
+  <div class="idea-card">
+    <div class="icon">🎯</div>
+    <div id="idea-budget-label" class="budget-label"></div>
+    <div id="idea-text" class="idea-text"></div>
+  </div>
+  <div id="fallback-controls" class="fallback-controls">
+    <button id="fallback-more" class="fallback-btn">Ещё вариант 🔁</button>
+    <button id="fallback-back" class="fallback-btn secondary">← Другой бюджет</button>
+  </div>
+</div>
+
+<script src="ideas.js"></script>
+<script>
+  // telegram-web-app.js всегда создаёт window.Telegram.WebApp, даже вне Telegram —
+  // поэтому проверяем platform, а не просто наличие объекта, чтобы понять,
+  // реально ли мы внутри Telegram (там platform не "unknown").
+  const tgRaw = window.Telegram ? window.Telegram.WebApp : null;
+  const tg = tgRaw && tgRaw.platform !== "unknown" ? tgRaw : null;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+  }
+
+  let currentBudget = null;
+  let lastIdeaText = null;
+
+  const screenBudget = document.getElementById("screen-budget");
+  const screenIdea = document.getElementById("screen-idea");
+
+  function showBudgetScreen() {
+    screenIdea.classList.remove("active");
+    screenBudget.classList.add("active");
+    if (tg) {
+      tg.MainButton.hide();
+      tg.BackButton.hide();
+    }
+  }
+
+  function pickIdea(budget) {
+    const pool = getIdeasByBudget(budget);
+    const candidates = pool.filter((i) => i.text !== lastIdeaText);
+    const list = candidates.length ? candidates : pool;
+    const idea = list[Math.floor(Math.random() * list.length)];
+    lastIdeaText = idea.text;
+    return idea.text;
+  }
+
+  function showIdeaScreen(budget) {
+    currentBudget = budget;
+    document.getElementById("idea-budget-label").textContent = BUDGET_LABELS[budget];
+    document.getElementById("idea-text").textContent = pickIdea(budget);
+
+    screenBudget.classList.remove("active");
+    screenIdea.classList.add("active");
+
+    if (tg) {
+      tg.MainButton.setText("Ещё вариант 🔁");
+      tg.MainButton.show();
+      tg.BackButton.show();
+    }
+  }
+
+  document.querySelectorAll(".budget-card").forEach((card) => {
+    card.addEventListener("click", () => showIdeaScreen(card.dataset.budget));
+  });
+
+  if (tg) {
+    tg.MainButton.onClick(() => showIdeaScreen(currentBudget));
+    tg.BackButton.onClick(() => showBudgetScreen());
+  } else {
+    // вне Telegram нативных кнопок нет — показываем свои для проверки в браузере
+    document.getElementById("fallback-controls").classList.add("visible");
+    document.getElementById("fallback-more").addEventListener("click", () => showIdeaScreen(currentBudget));
+    document.getElementById("fallback-back").addEventListener("click", () => showBudgetScreen());
+  }
+</script>
+</body>
+</html>
