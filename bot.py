@@ -6,8 +6,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 
 # ── настройки ──────────────────────────────────────────────────────────────────
 TOKEN = os.environ["BOT_TOKEN"]
-# GitHub Pages URL Mini App — заполнить после включения Pages в репозитории
-WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://example.github.io/idea_bot/")
+WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://boldyrev-tema.github.io/idea_bot/")
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s",
