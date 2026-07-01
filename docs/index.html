@@ -255,8 +255,14 @@
     }
   }
 
+  let requestSeq = 0; // защита от гонки состояний: если быстро тапнуть "Ещё вариант"
+                       // несколько раз подряд, старый (медленный) ответ не должен
+                       // перезаписать экран поверх более нового
+
   async function showIdeaScreen(budget) {
     currentBudget = budget;
+    const myRequestId = ++requestSeq;
+
     document.getElementById("idea-budget-label").textContent = BUDGET_LABELS[budget];
 
     ideaPlaceEl.style.display = "none";
@@ -276,9 +282,11 @@
       const resp = await fetch(`${API_BASE_URL}/api/idea?budget=${budget}`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
+      if (myRequestId !== requestSeq) return; // пришёл более новый запрос - этот ответ устарел
       ideaTextEl.classList.remove("loading-dots");
       renderIdea(data);
     } catch (e) {
+      if (myRequestId !== requestSeq) return;
       ideaTextEl.classList.remove("loading-dots");
       ideaPlaceEl.style.display = "none";
       ideaTextEl.style.display = "block";
