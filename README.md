@@ -21,7 +21,7 @@ Telegram Mini App, который подсказывает недорогие и
 
 - `bot.py` — Python, `python-telegram-bot` 21.6. Единственная задача — прислать
   кнопку, открывающую Mini App. Вся логика выбора идеи — в браузере.
-- `webapp/` — сам Mini App: `index.html` (разметка + стили + скрипт) и
+- `docs/` — сам Mini App: `index.html` (разметка + стили + скрипт) и
   `ideas.js` (30 идей). Никакого бэкенда для Mini App не нужно — контент
   статичный.
 - Подстраивается под тему Telegram (светлая/тёмная) через CSS-переменные
@@ -30,10 +30,10 @@ Telegram Mini App, который подсказывает недорогие и
 
 ## Деплой
 
-**Mini App (webapp/):** GitHub Pages — бесплатный HTTPS для статики
+**Mini App (docs/):** GitHub Pages — бесплатный HTTPS для статики
 (Telegram принимает только HTTPS-ссылки для Mini App).
 1. Запушить репозиторий на GitHub
-2. Settings → Pages → Deploy from branch → выбрать ветку и папку `webapp/`
+2. Settings → Pages → Deploy from branch → выбрать ветку и папку `docs/`
 3. Скопировать выданный URL (вида `https://<username>.github.io/<repo>/`)
 4. Указать его в переменной окружения `WEBAPP_URL` при запуске бота
 
@@ -48,7 +48,7 @@ export WEBAPP_URL=<URL после настройки GitHub Pages>
 python bot.py
 ```
 
-Проверить вёрстку Mini App без Telegram — просто открыть `webapp/index.html`
+Проверить вёрстку Mini App без Telegram — просто открыть `docs/index.html`
 в браузере (там свои резервные кнопки вместо нативных Telegram-кнопок).
 
 ## Дальше (не в MVP)
